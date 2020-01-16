@@ -56,9 +56,3 @@ plot_sentiment <- function(text){
     return(content_sentiment)
 }
 
-gen_full_urls <- get_links("http://www.o-bible.com/cgibin/ob.cgi?version=kjv&book=ge&chapter=1",css = ".cl a") %>%
-    cat_url("http://www.o-bible.com",link_list=.)
-    
-    
-paragraph_list <- map(gen_full_urls, read_webpage, css="#content .en")
-

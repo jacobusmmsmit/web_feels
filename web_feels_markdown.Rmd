@@ -1,0 +1,97 @@
+---
+title: "Web Scraping Functions"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r packages, include=FALSE}
+library(rvest)
+library(tidyverse)
+library(tidytext)
+#library(tm) #unsure if used
+```
+The packages we are using are tidyverse, rvest, tidytext. Rvest for webscraping and tidytext for text munging.  
+
+The first thing we'd like to be able to do is take the text from a webpage and import it into R. For this we define the function `read_webpage` which takes four inputs. The first is the URL of the page, the second is the css tag of the text from that page that you want to be imported, and the third and fourth are how many paragraphs should be left off from the beginning and the end respectively. In our case, we want the paragraph text, the body, so we set the default css to be `"p"`. This tends to vary site by site as often more than just the text we're looking for is in the `p` tag, so we need to be more precise in most cases. 
+
+```{r read_webpage, echo=TRUE}
+read_webpage <- function(urlsite, css="p", start_remove =0, end_remove=0){
+    content <- urlsite %>%
+        read_html() %>%
+        html_nodes(css) %>% # select only the text that uses the specific css from the input
+        html_text
+    if (start_remove > 0){
+        content <- tail(content,-start_remove)
+    }
+    if (end_remove > 0){
+        content <- head(content, -end_remove)
+    }
+    return(content)
+}
+```
+
+Next we need to get our text in a form that we can work with using. `format_text` takes the output of `read_webpage` and outputs a tibble of the words and their frequencies, as well as removing "stop words" (things like conjunctions and articles).
+
+```{r format_text}
+format_text <- function(content){
+    tibble(line = seq_along(content), text=content) %>%
+    unnest_tokens(word, text) %>%
+    anti_join(stop_words) # some words are not useful for analysis
+}
+```
+
+There are a few things that we can do with this now. A simple frequency bar chart can be a useful visualisation to get an idea of what you're working with. Let's use an example of the BBC culture page...
+
+```{r frequency_plot}
+read_webpage("http://www.bbc.com/culture/story/20200113-oscars-2020-why-do-male-tales-tend-to-win-awards")
+
+```
+
+```{r plot_sentiment, echo=TRUE}
+plot_sentiment <- function(text){
+    content_sentiment <- text %>%
+        inner_join(get_sentiments("bing")) %>%
+        count(line, sentiment) %>%
+        spread(sentiment, n, fill=0)%>%
+        mutate(sentiment = positive - negative,
+            end = cumsum(sentiment),
+            start = dplyr::lag(end , default = 0),
+            id = seq_along(line)) %>%
+        ggplot(aes(x=id,fill=factor(sign(sentiment)))) +
+        geom_rect(aes(xmin = id-0.45, xmax= id+0.45, ymin = start, ymax = end))+
+        scale_fill_manual(values = c("red3","blue3","green3")) +
+        theme(legend.position = "none") +
+        labs(x="Paragraph",y="Sentiment", title="Sentiment changes by paragraph")
+    return(content_sentiment)
+}
+```
+
+```{r get_links}
+get_links <- function(urlsite, css="a"){
+    links <- read_html(urlsite) %>%
+    html_nodes(css) %>%
+    html_attr("href")
+    return(links)
+}
+```
+
+```{r cat_url}
+cat_url <- function(urlsite, link_list){
+    url_list <- ("")
+    for (link in seq_along(link_list)){
+        url_list[link] <- paste(urlsite, link_list[link], sep="")
+    }
+    return(url_list)
+}
+```
+
+```{r bible_example}
+gen_full_urls <- get_links("http://www.o-bible.com/cgibin/ob.cgi?version=kjv&book=ge&chapter=1",css = ".cl a") %>%
+    cat_url("http://www.o-bible.com",link_list=.)
+    
+paragraph_list <- map(gen_full_urls, read_webpage, css="#content .en")
+```

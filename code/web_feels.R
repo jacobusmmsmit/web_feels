@@ -1,3 +1,4 @@
+
  library(rvest)
  library(tidyverse)
  library(tm) #unsure if used due to tidytext fulfilling same role
@@ -15,6 +16,7 @@ read_webpage <- function(urlsite, css="p", start_remove =0, end_remove=0){
     if (end_remove > 0){
         content <- head(content, -end_remove)
     }
+    content <- content[content != ""|content != " "]
     return(content)
 }
 
@@ -26,15 +28,15 @@ format_text <- function(content){
 
 get_links <- function(urlsite, css="a"){
     links <- read_html(urlsite) %>%
-    html_nodes(css) %>%
-    html_attr("href")
+    html_nodes(urlsite, "div.name > strong > a") #%>%
+    # html_attr("href")
     return(links)
 }
 
 cat_url <- function(urlsite, link_list){
     url_list <- ("")
     for (link in seq_along(link_list)){
-        url_list[link] <- paste(urlsite, link_list[link], sep="")
+        url_list[link] <- paste0(urlsite, link_list[link])
     }
     return(url_list)
 }
@@ -55,4 +57,3 @@ plot_sentiment <- function(text){
         labs(x="Paragraph",y="Sentiment", title="Sentiment changes by paragraph")
     return(content_sentiment)
 }
-
